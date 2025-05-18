@@ -9,18 +9,19 @@ from reportlab.lib.pagesizes import letter
 import io
 
 HOST = '127.0.0.1'
-PORT = 65432
+PORT = 65433  # UDP port
 
 def send_string_to_server(message):
     try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.connect((HOST, PORT))
-            s.sendall(message.encode())
-            data = s.recv(10000)
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.settimeout(5.0)  # Set timeout for UDP response
+            s.sendto(message.encode(), (HOST, PORT))
+            data, _ = s.recvfrom(10000)
             return data.decode()
     except Exception as e:
         return f"Error: {e}"
 
+# Rest of the code remains the same as the TCP client
 def reverse_input_string():
     user_input = entry.get("1.0", tk.END).strip()
     if not user_input:
@@ -144,7 +145,7 @@ def clear_text():
 
 # GUI Setup
 root = tk.Tk()
-root.title("String Reversal Client")
+root.title("String Reversal Client (UDP)")
 
 # Set window size and position it in center
 window_width = 600
@@ -161,7 +162,7 @@ conn_frame = tk.Frame(root, bg='#f0f0f0', padx=10, pady=5)
 conn_frame.pack(fill=tk.X)
 tk.Label(
     conn_frame,
-    text=f"Host: {HOST}",
+    text=f"Host: {HOST} (UDP)",
     font=('Helvetica', 10),
     bg='#f0f0f0',
     fg='#666666'
@@ -174,13 +175,14 @@ tk.Label(
     fg='#666666'
 ).pack(side=tk.LEFT)
 
+# Rest of the GUI code...
 # Title Frame
 title_frame = tk.Frame(root, bg='#2c3e50', pady=15)  # Dark blue background
 title_frame.pack(fill=tk.X)
 
 title_label = tk.Label(
     title_frame,
-    text="String Reversal Application",
+    text="String Reversal Application (UDP)",
     font=('Helvetica', 16, 'bold'),
     bg='#2c3e50',
     fg='white'
@@ -337,5 +339,3 @@ for btn in [reverse_btn, load_btn, clear_btn, save_btn]:
     btn.bind("<Leave>", on_leave)
 
 root.mainloop()
-
-
