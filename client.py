@@ -18,12 +18,15 @@ def send_string_to_server(message):
         return f"Error: {e}"
 
 def reverse_input_string():
-    user_input = entry.get()
+    user_input = entry.get("1.0", tk.END).strip()
     if not user_input:
         messagebox.showwarning("Input Required", "Please enter a string.")
         return
     reversed_str = send_string_to_server(user_input)
-    result_label.config(text=reversed_str)
+    result_label.config(state='normal')  # Enable editing temporarily
+    result_label.delete("1.0", tk.END)
+    result_label.insert("1.0", reversed_str)
+    result_label.config(state='disabled')  # Make read-only again
 
 def load_file():
     filepath = filedialog.askopenfilename(
@@ -42,8 +45,8 @@ def load_file():
             if not content:
                 messagebox.showwarning("Warning", "The selected file is empty")
                 return
-            entry.delete(0, tk.END)
-            entry.insert(0, content)
+            entry.delete("1.0", tk.END)
+            entry.insert("1.0", content)
             messagebox.showinfo("Success", f"File loaded successfully: {filepath}")
     except UnicodeDecodeError:
         messagebox.showerror("Error", "The selected file is not a valid text file")
@@ -51,11 +54,13 @@ def load_file():
         messagebox.showerror("Error", f"Failed to read file: {str(e)}")
 
 def save_reversed_text():
-    reversed_text = result_label.cget("text")
+    result_label.config(state='normal')  # Enable temporarily to get text
+    reversed_text = result_label.get("1.0", tk.END).strip()
+    result_label.config(state='disabled')  # Make read-only again
     if not reversed_text or reversed_text.isspace():
         messagebox.showwarning("Warning", "No reversed text to save!")
         return
-        
+    
     filepath = filedialog.asksaveasfilename(
         title="Save Reversed Text",
         filetypes=[("Text files", "*.txt")],
@@ -64,7 +69,7 @@ def save_reversed_text():
     
     if not filepath:
         return
-        
+    
     try:
         with open(filepath, 'w', encoding='utf-8') as file:
             file.write(reversed_text)
@@ -73,8 +78,10 @@ def save_reversed_text():
         messagebox.showerror("Error", f"Failed to save file: {str(e)}")
 
 def clear_text():
-    entry.delete(0, tk.END)
-    result_label.config(text="")
+    entry.delete("1.0", tk.END)
+    result_label.config(state='normal')
+    result_label.delete("1.0", tk.END)
+    result_label.config(state='disabled')
 
 # GUI Setup
 root = tk.Tk()
@@ -132,12 +139,31 @@ input_frame.pack(fill=tk.X, pady=(0, 10))
 tk.Label(
     input_frame,
     text="Enter text or load from file:",
-    font=('Helvetica', 10),
+    font=('Helvetica', 12),
     bg='#f0f0f0'
 ).pack(pady=(0, 5))
 
-entry = tk.Entry(input_frame, width=50, font=('Helvetica', 14))
-entry.pack(fill=tk.X, pady=(0, 10), ipady=5)
+# Create Text widget with scrollbar
+text_frame = tk.Frame(input_frame, bg='#f0f0f0')
+text_frame.pack(fill=tk.BOTH, expand=True)
+
+entry = tk.Text(
+    text_frame,
+    font=('Helvetica', 14),
+    height=5,
+    wrap=tk.WORD,
+    padx=10,
+    pady=10
+)
+entry.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+# Add scrollbar
+scrollbar = tk.Scrollbar(text_frame)
+scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+# Connect scrollbar to text widget
+entry.config(yscrollcommand=scrollbar.set)
+scrollbar.config(command=entry.yview)
 
 # Button Frame
 btn_frame = tk.Frame(content_frame, bg='#f0f0f0')
@@ -197,25 +223,37 @@ result_frame.pack(fill=tk.X, pady=20)
 # Label for "Reversed:" text
 tk.Label(
     result_frame,
-    text="Reversed:",
+    text="Reversed String:",
     font=('Helvetica', 14, 'bold'),
     bg='#f0f0f0'
 ).pack(pady=(0, 5))
 
-# Label for the actual reversed text
-result_label = tk.Label(
-    result_frame,
-    text="",
+# Create Text widget with scrollbar for result
+result_text_frame = tk.Frame(result_frame, bg='#f0f0f0')
+result_text_frame.pack(fill=tk.BOTH, expand=True)
+
+result_label = tk.Text(
+    result_text_frame,
     font=('Helvetica', 14),
     bg='#ffffff',  # White background
-    wraplength=550,  # Allow text to wrap
     relief=tk.SUNKEN,  # Add a sunken border effect
+    height=5,
     padx=10,
     pady=10,
-    width=40,
-    height=3
+    wrap=tk.WORD
 )
-result_label.pack(fill=tk.X)
+result_label.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+# Add scrollbar for result
+result_scrollbar = tk.Scrollbar(result_text_frame)
+result_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+# Connect scrollbar to text widget
+result_label.config(yscrollcommand=result_scrollbar.set)
+result_scrollbar.config(command=result_label.yview)
+
+# Make the result text widget read-only
+result_label.config(state='disabled')
 
 # Add hover effects for buttons
 def on_enter(e):
