@@ -3,6 +3,8 @@ import tkinter as tk
 from tkinter import filedialog, messagebox
 import os
 from docx import Document
+from PyPDF2 import PdfReader
+import io
 
 HOST = '127.0.0.1'
 PORT = 65432
@@ -30,26 +32,45 @@ def reverse_input_string():
 
 def load_file():
     filepath = filedialog.askopenfilename(
-        title="Select a Text File",
+        title="Select a File",
         filetypes=[
             ("Text files", "*.txt"),
+            ("Word files", "*.docx"),
+            ("PDF files", "*.pdf"),
             ("All files", "*.*")
         ]
     )
     if not filepath:
         messagebox.showinfo("Info", "No file was selected")
         return
+
     try:
-        with open(filepath, 'r', encoding='utf-8') as file:
-            content = file.read().strip()
-            if not content:
-                messagebox.showwarning("Warning", "The selected file is empty")
-                return
-            entry.delete("1.0", tk.END)
-            entry.insert("1.0", content)
-            messagebox.showinfo("Success", f"File loaded successfully: {filepath}")
-    except UnicodeDecodeError:
-        messagebox.showerror("Error", "The selected file is not a valid text file")
+        content = ""
+        file_extension = os.path.splitext(filepath)[1].lower()
+
+        if file_extension == '.txt':
+            with open(filepath, 'r', encoding='utf-8') as file:
+                content = file.read().strip()
+        
+        elif file_extension == '.docx':
+            doc = Document(filepath)
+            content = '\n'.join([paragraph.text for paragraph in doc.paragraphs])
+        
+        elif file_extension == '.pdf':
+            pdf = PdfReader(filepath)
+            content_parts = []
+            for page in pdf.pages:
+                content_parts.append(page.extract_text())
+            content = '\n'.join(content_parts)
+        
+        if not content:
+            messagebox.showwarning("Warning", "The selected file is empty")
+            return
+
+        entry.delete("1.0", tk.END)
+        entry.insert("1.0", content)
+        messagebox.showinfo("Success", f"File loaded successfully: {filepath}")
+    
     except Exception as e:
         messagebox.showerror("Error", f"Failed to read file: {str(e)}")
 
@@ -57,13 +78,18 @@ def save_reversed_text():
     result_label.config(state='normal')  # Enable temporarily to get text
     reversed_text = result_label.get("1.0", tk.END).strip()
     result_label.config(state='disabled')  # Make read-only again
+    
     if not reversed_text or reversed_text.isspace():
         messagebox.showwarning("Warning", "No reversed text to save!")
         return
     
     filepath = filedialog.asksaveasfilename(
         title="Save Reversed Text",
-        filetypes=[("Text files", "*.txt")],
+        filetypes=[
+            ("Text files", "*.txt"),
+            ("Word files", "*.docx"),
+            ("All files", "*.*")
+        ],
         defaultextension=".txt"
     )
     
@@ -71,8 +97,16 @@ def save_reversed_text():
         return
     
     try:
-        with open(filepath, 'w', encoding='utf-8') as file:
-            file.write(reversed_text)
+        file_extension = os.path.splitext(filepath)[1].lower()
+        
+        if file_extension == '.docx':
+            doc = Document()
+            doc.add_paragraph(reversed_text)
+            doc.save(filepath)
+        else:  # Default to txt
+            with open(filepath, 'w', encoding='utf-8') as file:
+                file.write(reversed_text)
+        
         messagebox.showinfo("Success", f"File saved successfully as {filepath}")
     except Exception as e:
         messagebox.showerror("Error", f"Failed to save file: {str(e)}")
@@ -139,7 +173,7 @@ input_frame.pack(fill=tk.X, pady=(0, 10))
 tk.Label(
     input_frame,
     text="Enter text or load from file:",
-    font=('Helvetica', 12),
+    font=('Helvetica', 14, 'bold'),
     bg='#f0f0f0'
 ).pack(pady=(0, 5))
 
@@ -196,16 +230,6 @@ load_btn = tk.Button(
 )
 load_btn.pack(side=tk.LEFT, padx=5)
 
-save_btn = tk.Button(
-    btn_frame,
-    text="Save Reversed Text",
-    command=save_reversed_text,
-    bg='#ADD8E6',  # Light blue
-    fg='black',
-    **button_style
-)
-save_btn.pack(side=tk.LEFT, padx=5)
-
 clear_btn = tk.Button(
     btn_frame,
     text="Clear",
@@ -255,6 +279,17 @@ result_scrollbar.config(command=result_label.yview)
 # Make the result text widget read-only
 result_label.config(state='disabled')
 
+# Add save button under the result text area
+save_btn = tk.Button(
+    result_frame,
+    text="Save Reversed Text",
+    command=save_reversed_text,
+    bg='#ADD8E6',  # Light blue
+    fg='black',
+    **button_style
+)
+save_btn.pack(pady=(10, 0))
+
 # Add hover effects for buttons
 def on_enter(e):
     e.widget['bg'] = {
@@ -272,7 +307,7 @@ def on_leave(e):
         'Clear': '#808080'  # Grey
     }[e.widget['text']]
 
-for btn in [reverse_btn, load_btn, save_btn, clear_btn]:
+for btn in [reverse_btn, load_btn, clear_btn, save_btn]:
     btn.bind("<Enter>", on_enter)
     btn.bind("<Leave>", on_leave)
 
