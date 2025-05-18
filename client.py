@@ -4,6 +4,8 @@ from tkinter import filedialog, messagebox
 import os
 from docx import Document
 from PyPDF2 import PdfReader
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
 import io
 
 HOST = '127.0.0.1'
@@ -14,7 +16,7 @@ def send_string_to_server(message):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect((HOST, PORT))
             s.sendall(message.encode())
-            data = s.recv(1024)
+            data = s.recv(10000)
             return data.decode()
     except Exception as e:
         return f"Error: {e}"
@@ -78,7 +80,6 @@ def save_reversed_text():
     result_label.config(state='normal')  # Enable temporarily to get text
     reversed_text = result_label.get("1.0", tk.END).strip()
     result_label.config(state='disabled')  # Make read-only again
-    
     if not reversed_text or reversed_text.isspace():
         messagebox.showwarning("Warning", "No reversed text to save!")
         return
@@ -88,6 +89,7 @@ def save_reversed_text():
         filetypes=[
             ("Text files", "*.txt"),
             ("Word files", "*.docx"),
+            ("PDF files", "*.pdf"),
             ("All files", "*.*")
         ],
         defaultextension=".txt"
@@ -103,6 +105,29 @@ def save_reversed_text():
             doc = Document()
             doc.add_paragraph(reversed_text)
             doc.save(filepath)
+        elif file_extension == '.pdf':
+            c = canvas.Canvas(filepath, pagesize=letter)
+            # Start writing at top of page with some margin
+            y = letter[1] - 50  # Start 50 points from top
+            # Split text into lines if it's too long
+            lines = reversed_text.split('\n')
+            for line in lines:
+                words = line.split()
+                current_line = ''
+                for word in words:
+                    if c.stringWidth(current_line + ' ' + word) < letter[0] - 100:  # Leave 50pt margin on each side
+                        current_line += ' ' + word if current_line else word
+                    else:
+                        c.drawString(50, y, current_line)
+                        y -= 20  # Move down 20 points
+                        current_line = word
+                    if y < 50:  # If near bottom of page
+                        c.showPage()  # Start new page
+                        y = letter[1] - 50  # Reset to top
+                if current_line:  # Draw any remaining text
+                    c.drawString(50, y, current_line)
+                    y -= 20
+            c.save()
         else:  # Default to txt
             with open(filepath, 'w', encoding='utf-8') as file:
                 file.write(reversed_text)
